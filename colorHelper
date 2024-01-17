@@ -1,0 +1,107 @@
+import { colorDictionary } from 'providers/ThemeProvider.colors.helper';
+import { hasValue } from './utils';
+
+/**
+ * function that takes in a hex color and returns the RGB equivalent values
+ * @param {string} hex
+ * @returns an object with keys of r, g, and b
+ */
+function hexToRGB(hex) {
+  const strippedHex = hex.replace('#', '');
+  const r = parseInt(strippedHex.substring(0, 2), 16);
+  const g = parseInt(strippedHex.substring(2, 4), 16);
+  const b = parseInt(strippedHex.substring(4, 6), 16);
+  return { r, g, b };
+}
+
+/**
+ * function that calculates the euclidean distance between two hex values
+ * @param {string} dynamicHex hex value we want to convert to a static value
+ * @param {string} staticHex hex value we want to compare
+ * @returns {number} euclidean distance between the two colors
+ */
+function colorDifference(dynamicHex, staticHex) {
+  const dynamicRGB = hexToRGB(dynamicHex);
+  const staticRGB = hexToRGB(staticHex);
+
+  /* eslint-disable no-bitwise */
+  const diff = Math.sqrt(
+    Math.pow(dynamicRGB.r - staticRGB.r, 2),
+    Math.pow(dynamicRGB.g - staticRGB.g, 2),
+    Math.pow(dynamicRGB.b - staticRGB.b, 2)
+  );
+  /* eslint-enable no-bitwise */
+
+  return diff;
+}
+
+/**
+ * function that determines which of a series of colors most closely matches a
+ * dynamically generated color.
+ * @param {string} dynamicHex hex value we want to convert to a static value
+ * @returns {string} the static hex value that is found to be closest to the
+ * dynamic hex value
+ */
+// We initialize outside of the function so that changes to primaryColors
+// persist when the function is called multiple times
+let primaryColors = Object.keys(colorDictionary);
+function findClosestColor(dynamicHex) {
+  // if all colors have been used, reset primaryColors to the values from the
+  // initial object/dictionary
+  if (primaryColors.length === 0) {
+    primaryColors = Object.keys(colorDictionary);
+  }
+
+  // we determine which color from our static dictionary is closest to dynamicHex
+  const minDiffObj = primaryColors.reduce(
+    (minColorObj, hexColor, idx) => {
+      const colorDistance = colorDifference(dynamicHex, hexColor);
+      if (idx === 0) {
+        return { diff: colorDistance, idx };
+      }
+      if (hasValue(minColorObj.diff) && minColorObj.diff > colorDistance) {
+        return { diff: colorDistance, idx };
+      }
+      return minColorObj;
+    },
+    { diff: undefined, idx: undefined }
+  );
+
+  // we remove the selected color from primaryColors so that the color will not
+  // be repeated (unless there are more than 20 supervisors)
+  const selectedColor = primaryColors.splice(minDiffObj.idx, 1);
+  return selectedColor[0];
+}
+
+/**
+ * function that takes in a name and returns a unique hex color based upon a
+ * hash created from the contents of the string
+ * downloaded from demo at: https://mui.com/material-ui/react-avatar/
+ * then modified slightly
+ * @param {string} string: the first/last name of an individual
+ * @returns hex color for use as background color
+ */
+export function stringToColor(string) {
+  let hash = 0;
+  let i;
+
+  /* eslint-disable no-bitwise */
+  for (i = 0; i < string.length; i += 1) {
+    hash = string.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  let color = '#';
+
+  for (i = 0; i < 3; i += 1) {
+    const value = (hash >> (i * 8)) & 0xff;
+    color += `00${value.toString(16)}`.slice(-2);
+  }
+  /* eslint-enable no-bitwise */
+
+  // we have a specific list of color blind friendly colors, so we want to find
+  // the predefined color that is closest to our custom color
+  const closestColor = findClosestColor(color);
+
+  return closestColor;
+}
+
